@@ -1,0 +1,53 @@
+with global_gas_flare as(
+  select Country, Latitude, Longitude, bcm,Year ,MMscfd, `Field  Type`, `Field Name`, `Field  Operator`, Location, `Flare Level`,`Flaring Vol _million m3_`,
+  rank() over (partition by `Field  Operator` order by Country) as operators_per_country
+  from `gas_flare.global`
+  where `Flaring Vol _million m3_` is not null
+  and MMscfd is not null
+  and bcm is not null
+  and Year is not null
+
+),
+country_level as(
+  select country,
+  sum(`Flaring Vol _million m3_`) as Total_flaring_country_level,
+  avg(`Flaring Vol _million m3_`) as avg_flaring_country,
+   count(*) as number_of_active_flaring_sites,
+  RANK() OVER (ORDER BY SUM(`Flaring Vol _million m3_`) DESC) AS country_global_rank
+  from global_gas_flare
+GROUP BY country
+),
+operator_level as(
+  select `Field  Operator`,
+   sum(`Flaring Vol _million m3_`) as total_flaring_operator,
+  COUNT(*) AS records_count,
+   RANK() OVER (ORDER BY SUM(`Flaring Vol _million m3_`) DESC) AS operator_global_rank
+   from global_gas_flare
+   group by `Field  Operator`),
+ location_level as (
+  select Location,
+   COUNT(*) AS records_count,
+  RANK() OVER (ORDER BY SUM(`Flaring Vol _million m3_`) DESC) AS location_global_rank
+FROM global_gas_flare
+group by Location
+),
+annual_metics as (
+  select Year,
+  sum(`Flaring Vol _million m3_`) as current_year_flaring,
+  from global_gas_flare
+  group by year
+),
+TIME_TREND_ANALYSIS as(
+  select year,
+  current_year_flaring,
+  lag( current_year_flaring,1 ) over (order by Year) as previous_year_flare,
+ (current_year_flaring- lag( current_year_flaring,1 ) over (order by Year))/nullif(lag( current_year_flaring,1 ) over (order by Year),0) * 100 as yoy_percentage_change
+ from annual_metics
+ order by year
+)
+ 
+select *
+from global_gas_flare
+
+
+
